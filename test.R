@@ -39,6 +39,8 @@ X_100=sample(X,B.s[3])
 X_250=sample(X,B.s[4])
 X_500=sample(X,B.s[5])
 
+
+## Sheather and Jones
 L_4=function(x){
   
   value_1=exp(-x*x/2)/sqrt(2*pi)
@@ -91,5 +93,7 @@ for (i in 1:1000){
   
 } 
 plot(h,ans)
-uni <- uniroot(equation,c(0.001,1))
-uni$root
+h_opti_hat <- uniroot(equation,c(0.001,1))$root
+
+
+###
