@@ -57,6 +57,30 @@ mu_B_sm=function(matrice_x,data,values_x){
   return(list(hat=output_hat,tilde=output_tilde))
 }
 
+curve_smoothing$y
+x_y=cbind(curve_smoothing$x,curve_smoothing$y)
+mu_B=function(B,data,values_x){
+  n_x=length(values_x)
+  output_tilde=matrix(0,ncol=n_x,nrow=B)
+  curve_smoothing=smooth.spline(data$times,data$accel,df=12,spar=b)
+  b=curve_smoothing$spar
+  b=find_b(b)
+  
+  for (i in 1:B){
+    curve_smoothing$y
+    x_y=cbind(curve_smoothing$x,curve_smoothing$y)
+    
+    times_x=data$times[matrice_x[,i]]
+    accel_x=data$accel[matrice_x[,i]]
+    accel.spline_x_hat=smooth.spline(times_x,accel_x,df=12)
+    output_hat[i,]=predict(accel.spline_x_hat,values_x)$y
+    b=find_b(accel.spline_x_hat$spar)
+    accel.spline_x_tilde=smooth.spline(times_x,accel_x,df=12,spar=b)
+    output_tilde[i,]=predict(accel.spline_x_tilde,values_x)$y
+  }
+  return(list(hat=output_hat,tilde=output_tilde))
+}
+
 CI=function(output_mu_B){
   n_x=dim(output_mu_B$hat)[2]
   B=dim(output_mu_B$hat)[1]
@@ -79,7 +103,7 @@ CI=function(output_mu_B){
 x_point=c(10,20,25,30,35,45,50)
 B=1000
 mcycle_B=bootystrapy(mcycle,B)
-
+matrice_x=mcycle_B
 mu_sm=mu_B_sm(mcycle_B,mcycle,x_point)
 
 CI_mu_sm=CI(mu_sm)
