@@ -21,13 +21,20 @@ find_b=function(b){
   else{return(b+(1-b)/2)}
 }
 
+
+accel.spline=smooth.spline(mcycle$times,mcycle$accel,df=12)
 b=accel.spline$spar
-b=find_b(b)
+
+b=b+0.1
 accel.spline2=smooth.spline(mcycle$times,mcycle$accel,df=12,spar=b)
-lines(accel.spline2,col="red",type="l")
+b=b-0.2
+accel.spline3=smooth.spline(mcycle$times,mcycle$accel,df=12,spar=b)
 
 ##Residual
-plot(times,accel-accel.spline$y)
+par(mfrow=c(1, 3))
+plot(times,accel-accel.spline$y,main="Cross-validation",xlab="time",ylab="accel")
+plot(times,accel-accel.spline2$y,main="Smoother",xlab="time",ylab="accel")
+plot(times,accel-accel.spline3$y,main="Less-smoother",xlab="time",ylab="accel")
 
 ##Getting the different values of mu
 
@@ -37,8 +44,8 @@ mu_B_sm=function(B,data,values_x){
   n=length(data$times)
   output_hat=matrix(0,ncol=n_x,nrow=B)
   
-  curve_smoothing=smooth.spline(data$times,data$accel,df=12)
-  b=curve_smoothing$spar
+  curve_smoothing_normal=smooth.spline(data$times,data$accel,df=12)
+  b=curve_smoothing_normal$spar
   
   curve_smoothing=smooth.spline(data$times,data$accel,df=12,spar=b+0.1)
   
