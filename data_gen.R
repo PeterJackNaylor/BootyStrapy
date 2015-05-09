@@ -29,33 +29,7 @@ lines(accel.spline2,col="red",type="l")
 ##Residual
 plot(times,accel-accel.spline$y)
 
-#bootstrap address in table : (x,y)
-bootystrapy=function(data,B){
-  n=dim(data)[1]
-  matrice_x=c()
-  for ( i in 1:B ){
-    matrice_x=cbind(matrice_x,sample(c(1:n),n,replace=T))
-  }
-  return(matrice_x)
-}
-
 ##Getting the different values of mu
-mu_B_sm=function(matrice_x,data,values_x){
-  n_x=length(values_x)
-  B=dim(matrice_x)[2]
-  output_hat=matrix(0,ncol=n_x,nrow=B)
-  output_tilde=matrix(0,ncol=n_x,nrow=B)
-  for (i in 1:B){
-    times_x=data$times[matrice_x[,i]]
-    accel_x=data$accel[matrice_x[,i]]
-    accel.spline_x_hat=smooth.spline(times_x,accel_x,df=12)
-    output_hat[i,]=predict(accel.spline_x_hat,values_x)$y
-    b=find_b(accel.spline_x_hat$spar)
-    accel.spline_x_tilde=smooth.spline(times_x,accel_x,df=12,spar=b)
-    output_tilde[i,]=predict(accel.spline_x_tilde,values_x)$y
-  }
-  return(list(hat=output_hat,tilde=output_tilde))
-}
 
 mu_B_sm=function(B,data,values_x){
   
@@ -65,8 +39,10 @@ mu_B_sm=function(B,data,values_x){
   
   curve_smoothing=smooth.spline(data$times,data$accel,df=12)
   b=curve_smoothing$spar
-  b=find_b(b)
-  curve_smoothing2=smooth.spline(data$times,data$accel,df=12,spar=b)
+  
+  curve_smoothing=smooth.spline(data$times,data$accel,df=12,spar=b+0.1)
+  
+  curve_smoothing2=smooth.spline(data$times,data$accel,df=12,spar=b-0.1)
   
   epsilon_star=sample(residuals(curve_smoothing2),n,replace=T)
   y_star=fitted(curve_smoothing)+epsilon_star
@@ -103,13 +79,12 @@ CI=function(output_mu_B){
   return(res)
 }
 
-CI(output_mu_B)
 ##Plotting confidence points for smothing spline
 
 x_point=c(10,20,25,30,35,45,50)
 B=1000
 
-mu_sm=mu_B(B,mcycle,x_point)
+mu_sm=mu_B_sm(B,mcycle,x_point)
 
 CI_mu_sm=CI(mu_sm)
 CI_mu_sm
@@ -125,7 +100,8 @@ for (x in x_point){
   arrows(x, CI_mu_sm[2,i], x, CI_mu_sm[1,i], col= 'orange',length = 0.1, angle = 90)
 }
 
-## Finding the right h
+## Finding the right h / cross validation
+
 gamma_i=function(x,X,h,i){
   gam=dnorm((x-X)/h)
   return((gam/sum(gam))[i])
@@ -142,23 +118,21 @@ quantity=function(y,y.hat,X,h){
   val=sum(num/dem)
   return(val)
 }
-cross_validation=function(list_x,data){
+cross_validation=function(x,y){
   h=1
   best_h=h
-  times_b=data$times[list_x]
-  accel_b=data$accel[list_x]
   
-  curve_smooth=ksmooth(times_b,accel_b, kernel="normal",bandwidth=best_h,
-                       range.x = range(times_b),
-                       n.points = max(100L, length(times_b)),times_b)
-  best_val=quantity(curve_smooth$y,accel_b,times_b,best_h)
+  curve_smooth=ksmooth(x,y, kernel="normal",bandwidth=best_h,
+                       range.x = range(x),
+                       n.points = max(100L, length(x)),x)
+  best_val=quantity(curve_smooth$y,y,x,best_h)
   for (i in range(10000)){
     h=h+0.0001
-    test_curve_smooth=ksmooth(times_b,accel_b, kernel="normal", 
+    test_curve_smooth=ksmooth(x,y, kernel="normal", 
                          bandwidth=h,
-                         range.x = range(times_b),
-                         n.points = max(100L, length(times_b)),times_b)
-    test_best_val=quantity(curve_smooth$y,accel_b,times_b,h)
+                         range.x = range(x),
+                         n.points = max(100L, length(x)),x)
+    test_best_val=quantity(curve_smooth$y,y,x,h)
     if (test_best_val<best_val){
       curve_smooth=test_curve_smooth
       best_h=h
@@ -167,65 +141,45 @@ cross_validation=function(list_x,data){
   return(best_h)
   
 }
+## Nadaraya et Watson
 
 mu_B_ks=function(B,data,values_x){
   
   n_x=length(values_x)
   n=length(data$times)
   output_hat=matrix(0,ncol=n_x,nrow=B)
-  h=3
+  
+  h=npregbw(xdat=data$times, ydat=data$accel,regtype="lc")$bw
+
   k_smooth=ksmooth(data$times,data$accel, kernel="normal", 
-                   bandwidth=h,range.x = range(times_x),
+                   bandwidth=2*h,range.x = range(times_x),
                    n.points = max(100L, length(times_x)),data$times)
   
-  h=h*2
+
   k_smooth2=ksmooth(data$times,data$accel, kernel="normal", 
-             bandwidth=h,range.x = range(times_x),
+             bandwidth=h/2,range.x = range(times_x),
              n.points = max(100L, length(times_x)),data$times)
   
-  output_tilde=matrix(0,ncol=n_x,nrow=B)
+  epsilon_s=data$accel-k_smooth2$y
   
+  mu_hat_x   = ksmooth(data$times,data$accel, kernel="normal", 
+                       bandwidth=h,range.x = range(times_x),
+                       n.points = max(100L, length(times_x)),values_x)$y
+  mu_tilde_x = ksmooth(data$times,data$accel, kernel="normal", 
+                       bandwidth=2*h,range.x = range(times_x),
+                       n.points = max(100L, length(times_x)),values_x)$y
+    
   for (i in 1:B){
-    times_x=data$times[matrice_x[,i]]
-    accel_x=data$accel[matrice_x[,i]]
+    epsilon_star=sample(epsilon_s,n,replace=T)
+    y_star=k_smooth$y+epsilon_star
+    
     ##h=cross_validation(matrice_x[,i],mcycle)
-    h=3
-    accel.ksm_x_hat=ksmooth(times_x,accel_x, kernel="normal", 
+    h=npregbw(xdat=data$times, ydat=y_star,regtype="lc")$bw
+    accel.ksm_x_hat=ksmooth(data$times,y_star, kernel="normal", 
                             bandwidth=h,range.x = range(times_x),
                             n.points = max(100L, length(times_x)),values_x)
+    
     output_hat[i,]=accel.ksm_x_hat$y
-    b=h*2
-    accel.ksm_x_tilde=ksmooth(times_x,accel_x, kernel="normal", 
-                                bandwidth=b,range.x = range(times_x),
-                                n.points = max(100L, length(times_x)),values_x)
-    output_tilde[i,]=accel.ksm_x_hat$y
-  }
-  return(list(hat=output_hat,tilde=output_tilde))
-}
-mu_B_sm=function(B,data,values_x){
-  
-  n_x=length(values_x)
-  n=length(data$times)
-  output_hat=matrix(0,ncol=n_x,nrow=B)
-  
-  curve_smoothing=smooth.spline(data$times,data$accel,df=12)
-  b=curve_smoothing$spar
-  b=find_b(b)
-  curve_smoothing2=smooth.spline(data$times,data$accel,df=12,spar=b)
-  
-  epsilon_star=sample(residuals(curve_smoothing2),n,replace=T)
-  y_star=fitted(curve_smoothing)+epsilon_star
-  
-  mu_hat_x   = predict(curve_smoothing  , values_x)$y
-  mu_tilde_x = predict(curve_smoothing2 , values_x)$y
-  
-  for (i in 1:B){
-    epsilon_star=sample(residuals(curve_smoothing2),n,replace=T)
-    y_star=fitted(curve_smoothing)+epsilon_star
-    
-    curve_smoothing_star=smooth.spline(data$times,y_star,df=12)
-    
-    output_hat[i,]=predict(curve_smoothing_star,values_x)$y
   }
   return(list(hat=mu_hat_x,tilde=mu_tilde_x,hat_star=output_hat))
 }
@@ -233,19 +187,20 @@ mu_B_sm=function(B,data,values_x){
 ##Plotting confidence intervals for certain points
 
 B=1000
-mcycle_B=bootystrapy(mcycle,B)
-
 
 x_point=c(10,20,25,30,35,45,50)
 
-mu_ks=mu_B_ks(mcycle_B,mcycle,x_point)
+mu_ks=mu_B_ks(B,mcycle,x_point)
 
 CI_mu_ks=CI(mu_ks)
 CI_mu_ks
 
+
+h=npregbw(xdat=mcycle$times, ydat=mcycle$accel,regtype="lc")$bw
+
 plot(mcycle$times,mcycle$accel,main="kernel smoothing",xlab="time",ylab="accel")
 kernel_smooth=ksmooth(mcycle$times,mcycle$accel, kernel="normal", 
-                      bandwidth=3)
+                      bandwidth=2*h)
 lines(kernel_smooth,col="blue",type="l")
 
 i=0
@@ -262,8 +217,10 @@ for (x in x_point){
 
 plot(mcycle$times,mcycle$accel,main="Comparaison",xlab="time",ylab="accel")
 
+h=npregbw(xdat=mcylce$times, ydat=mcycle$accel,regtype="lc")$bw
+
 kernel_smooth=ksmooth(mcycle$times,mcycle$accel, kernel="normal", 
-                      bandwidth=3)
+                      bandwidth=h)
 lines(kernel_smooth,col="blue",type="l")
 
 i=0
@@ -285,5 +242,3 @@ for (x in x_point){
 
 legend(40,-50,legend =c("kernel smoothing", "spline smoothing", "CI for k_s","CI for s_s"), col = c("blue","green","red","orange"),
        pch = 15, bty = "n", pt.cex = 2, cex = 0.8,, inset = c(0.1, 0.1))
-
-legend(3,0.6,legend = c("(a,b)=(1,0.5)","(a,b)=(1,2)","(a,b)=(1,10)","(a,b)=(2,2)","Jeffrey"), col = colours, pch = 15, bty = "n", pt.cex = 2, cex = 0.8,, inset = c(0.1, 0.1))
