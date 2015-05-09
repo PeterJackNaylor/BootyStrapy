@@ -249,3 +249,12 @@ for (x in x_point){
 
 legend(40,-50,legend =c("kernel smoothing", "spline smoothing", "CI for k_s","CI for s_s"), col = c("blue","green","red","orange"),
        pch = 15, bty = "n", pt.cex = 2, cex = 0.8,, inset = c(0.1, 0.1))
+
+
+##############################################################
+
+epshat=c()
+for (i in 1:n){
+  val=accel[i]-mh(times[i],h,n)
+  epshat[i]<-epshat[i]
+}
