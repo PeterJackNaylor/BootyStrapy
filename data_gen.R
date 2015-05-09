@@ -2,11 +2,11 @@ library(np)
 library(MASS)
 
 ##Data
-table=read.table('C:/Users/Peter-Jack/Dropbox/work/Bootstrap et ré echantillonage/BootyStrapy/mcycle.txt',header=TRUE)
+table=read.table('C:/Users/Peter-Jack/Dropbox/work/Bootstrap/BootyStrapy/mcycle.txt',header=TRUE)
 attach(table)
 
 ##number of boostrap samples
-B=100
+B=1000
 
 ##spline smoothing
 plot(mcycle$times,mcycle$accel)
@@ -17,7 +17,7 @@ lines(accel.spline,col="blue",type="l")
 find_b=function(b){
   #  if (b<1/2){return(2*b)}
   #    else{return(b+(1-b)/2)}
-  if (b<0.94){return(b+0.06)}
+  if (b<0.96){return(b+0.04)}
   else{return(b+(1-b)/2)}
 }
 
@@ -57,54 +57,59 @@ mu_B_sm=function(matrice_x,data,values_x){
   return(list(hat=output_hat,tilde=output_tilde))
 }
 
-curve_smoothing$y
-x_y=cbind(curve_smoothing$x,curve_smoothing$y)
-mu_B=function(B,data,values_x){
+mu_B_sm=function(B,data,values_x){
+  
   n_x=length(values_x)
-  output_tilde=matrix(0,ncol=n_x,nrow=B)
-  curve_smoothing=smooth.spline(data$times,data$accel,df=12,spar=b)
+  n=length(data$times)
+  output_hat=matrix(0,ncol=n_x,nrow=B)
+  
+  curve_smoothing=smooth.spline(data$times,data$accel,df=12)
   b=curve_smoothing$spar
   b=find_b(b)
+  curve_smoothing2=smooth.spline(data$times,data$accel,df=12,spar=b)
+  
+  epsilon_star=sample(residuals(curve_smoothing2),n,replace=T)
+  y_star=fitted(curve_smoothing)+epsilon_star
+  
+  mu_hat_x   = predict(curve_smoothing  , values_x)$y
+  mu_tilde_x = predict(curve_smoothing2 , values_x)$y
   
   for (i in 1:B){
-    curve_smoothing$y
-    x_y=cbind(curve_smoothing$x,curve_smoothing$y)
+    epsilon_star=sample(residuals(curve_smoothing2),n,replace=T)
+    y_star=fitted(curve_smoothing)+epsilon_star
     
-    times_x=data$times[matrice_x[,i]]
-    accel_x=data$accel[matrice_x[,i]]
-    accel.spline_x_hat=smooth.spline(times_x,accel_x,df=12)
-    output_hat[i,]=predict(accel.spline_x_hat,values_x)$y
-    b=find_b(accel.spline_x_hat$spar)
-    accel.spline_x_tilde=smooth.spline(times_x,accel_x,df=12,spar=b)
-    output_tilde[i,]=predict(accel.spline_x_tilde,values_x)$y
+    curve_smoothing_star=smooth.spline(data$times,y_star,df=12)
+    
+    output_hat[i,]=predict(curve_smoothing_star,values_x)$y
   }
-  return(list(hat=output_hat,tilde=output_tilde))
+  return(list(hat=mu_hat_x,tilde=mu_tilde_x,hat_star=output_hat))
 }
 
 CI=function(output_mu_B){
-  n_x=dim(output_mu_B$hat)[2]
-  B=dim(output_mu_B$hat)[1]
+  n_x=dim(output_mu_B$hat_star)[2]
+  B=dim(output_mu_B$hat_star)[1]
   res=matrix(0,nrow=2,ncol=n_x)
   for (i in 1:n_x){
-    mu_tilde=na.omit(output_mu_B$tilde[,i])
-    mu_hat=na.omit(output_mu_B$hat[,i])
-    mu_hat=sort(mu_hat)
-    mu_tilde_mean=mean(mu_tilde)
-    mu_hat_mean=mean(mu_hat)
-    res[1,i]=mu_hat_mean-(mu_hat[as.integer(length(mu_hat)*0.95)]-mu_tilde_mean)
-    res[2,i]=mu_hat_mean-(mu_hat[as.integer(length(mu_hat)*0.05)]-mu_tilde_mean)
+    mu.hat.x=output_mu_B$hat[i]
+    mu.til.x=output_mu_B$tilde[i]
+    
+    mu.x.star=sort(na.omit(output_mu_B$hat_star[,i]))
+    
+    res[1,i]=mu.hat.x-(mu.x.star[as.integer(length(mu.x.star)*0.95)]-mu.til.x)
+                       
+    res[2,i]=mu.hat.x-(mu.x.star[as.integer(length(mu.x.star)*0.05)]-mu.til.x)
+                       
   }
   return(res)
 }
 
-
+CI(output_mu_B)
 ##Plotting confidence points for smothing spline
 
 x_point=c(10,20,25,30,35,45,50)
 B=1000
-mcycle_B=bootystrapy(mcycle,B)
-matrice_x=mcycle_B
-mu_sm=mu_B_sm(mcycle_B,mcycle,x_point)
+
+mu_sm=mu_B(B,mcycle,x_point)
 
 CI_mu_sm=CI(mu_sm)
 CI_mu_sm
@@ -163,11 +168,23 @@ cross_validation=function(list_x,data){
   
 }
 
-mu_B_ks=function(matrice_x,data,values_x){
+mu_B_ks=function(B,data,values_x){
+  
   n_x=length(values_x)
-  B=dim(matrice_x)[2]
+  n=length(data$times)
   output_hat=matrix(0,ncol=n_x,nrow=B)
+  h=3
+  k_smooth=ksmooth(data$times,data$accel, kernel="normal", 
+                   bandwidth=h,range.x = range(times_x),
+                   n.points = max(100L, length(times_x)),data$times)
+  
+  h=h*2
+  k_smooth2=ksmooth(data$times,data$accel, kernel="normal", 
+             bandwidth=h,range.x = range(times_x),
+             n.points = max(100L, length(times_x)),data$times)
+  
   output_tilde=matrix(0,ncol=n_x,nrow=B)
+  
   for (i in 1:B){
     times_x=data$times[matrice_x[,i]]
     accel_x=data$accel[matrice_x[,i]]
@@ -184,6 +201,33 @@ mu_B_ks=function(matrice_x,data,values_x){
     output_tilde[i,]=accel.ksm_x_hat$y
   }
   return(list(hat=output_hat,tilde=output_tilde))
+}
+mu_B_sm=function(B,data,values_x){
+  
+  n_x=length(values_x)
+  n=length(data$times)
+  output_hat=matrix(0,ncol=n_x,nrow=B)
+  
+  curve_smoothing=smooth.spline(data$times,data$accel,df=12)
+  b=curve_smoothing$spar
+  b=find_b(b)
+  curve_smoothing2=smooth.spline(data$times,data$accel,df=12,spar=b)
+  
+  epsilon_star=sample(residuals(curve_smoothing2),n,replace=T)
+  y_star=fitted(curve_smoothing)+epsilon_star
+  
+  mu_hat_x   = predict(curve_smoothing  , values_x)$y
+  mu_tilde_x = predict(curve_smoothing2 , values_x)$y
+  
+  for (i in 1:B){
+    epsilon_star=sample(residuals(curve_smoothing2),n,replace=T)
+    y_star=fitted(curve_smoothing)+epsilon_star
+    
+    curve_smoothing_star=smooth.spline(data$times,y_star,df=12)
+    
+    output_hat[i,]=predict(curve_smoothing_star,values_x)$y
+  }
+  return(list(hat=mu_hat_x,tilde=mu_tilde_x,hat_star=output_hat))
 }
 
 ##Plotting confidence intervals for certain points
