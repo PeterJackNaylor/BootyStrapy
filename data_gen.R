@@ -253,8 +253,27 @@ legend(40,-50,legend =c("kernel smoothing", "spline smoothing", "CI for k_s","CI
 
 ##############################################################
 
-epshat=c()
-for (i in 1:n){
-  val=accel[i]-mh(times[i],h,n)
-  epshat[i]<-epshat[i]
-}
+# WILD BOOTSTRAP 
+
+rm(list=ls())
+
+library(bbemkr)
+library(fANCOVA)
+table=read.table("mcycle.txt",header=TRUE)
+attach(table)
+
+x=times
+y=accel
+NW=NadarayaWatsonkernel(x, y, h = 1, gridpoint = x)
+mat <- cbind(y,NW$mh)
+matplot(x, mat,pch=3)
+# plot(NW$gridpoint,NW$mh,col='blue')
+reshat<- y-NW$mh
+reshat
+res.boot <- wild.boot(reshat, nboot=1)
+res.boot
+NW2<-NadarayaWatsonkernel(x, y, h = 3, gridpoint = x)
+ystar<-NW2$mh+res.boot
+result<-NadarayaWatsonkernel(x, ystar, h = 2, gridpoint = x)
+mat2<- cbind(y,result$mh)
+matplot(x, mat2,pch=3)
