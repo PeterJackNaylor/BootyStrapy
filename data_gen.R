@@ -35,6 +35,7 @@ par(mfrow=c(1, 3))
 plot(times,accel-accel.spline$y,main="Cross-validation",xlab="time",ylab="accel")
 plot(times,accel-accel.spline2$y,main="Smoother",xlab="time",ylab="accel")
 plot(times,accel-accel.spline3$y,main="Less-smoother",xlab="time",ylab="accel")
+par(mfrow=c(1, 1))
 
 ##Getting the different values of mu
 
@@ -156,8 +157,8 @@ mu_B_ks=function(B,data,values_x){
   n=length(data$times)
   output_hat=matrix(0,ncol=n_x,nrow=B)
   
-  h=npregbw(xdat=data$times, ydat=data$accel,regtype="lc")$bw
-
+  #h=npregbw(xdat=data$times, ydat=data$accel,regtype="lc")$bw
+  h=3
   k_smooth=ksmooth(data$times,data$accel, kernel="normal", 
                    bandwidth=2*h,range.x = range(times_x),
                    n.points = max(100L, length(times_x)),data$times)
@@ -180,8 +181,7 @@ mu_B_ks=function(B,data,values_x){
     epsilon_star=sample(epsilon_s,n,replace=T)
     y_star=k_smooth$y+epsilon_star
     
-    ##h=cross_validation(matrice_x[,i],mcycle)
-    h=npregbw(xdat=data$times, ydat=y_star,regtype="lc")$bw
+    ##h=npregbw(xdat=data$times, ydat=y_star,regtype="lc")$bw
     accel.ksm_x_hat=ksmooth(data$times,y_star, kernel="normal", 
                             bandwidth=h,range.x = range(times_x),
                             n.points = max(100L, length(times_x)),values_x)
@@ -222,10 +222,10 @@ for (x in x_point){
 
 ##Plotting both at the same time:
 
-plot(mcycle$times,mcycle$accel,main="Comparaison",xlab="time",ylab="accel")
+plot(mcycle$times,mcycle$accel,main="Non parametric estimation",xlab="time",ylab="accel")
 
 h=npregbw(xdat=mcylce$times, ydat=mcycle$accel,regtype="lc")$bw
-
+h=2
 kernel_smooth=ksmooth(mcycle$times,mcycle$accel, kernel="normal", 
                       bandwidth=h)
 lines(kernel_smooth,col="blue",type="l")
