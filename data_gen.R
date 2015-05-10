@@ -157,8 +157,8 @@ mu_B_ks=function(B,data,values_x){
   n=length(data$times)
   output_hat=matrix(0,ncol=n_x,nrow=B)
   
-  #h=npregbw(xdat=data$times, ydat=data$accel,regtype="lc")$bw
-  h=3
+  h=npregbw(xdat=data$times, ydat=data$accel,regtype="lc")$bw
+  
   k_smooth=ksmooth(data$times,data$accel, kernel="normal", 
                    bandwidth=2*h,range.x = range(times_x),
                    n.points = max(100L, length(times_x)),data$times)
@@ -181,7 +181,7 @@ mu_B_ks=function(B,data,values_x){
     epsilon_star=sample(epsilon_s,n,replace=T)
     y_star=k_smooth$y+epsilon_star
     
-    ##h=npregbw(xdat=data$times, ydat=y_star,regtype="lc")$bw
+    h=npregbw(xdat=data$times, ydat=y_star,regtype="lc")$bw
     accel.ksm_x_hat=ksmooth(data$times,y_star, kernel="normal", 
                             bandwidth=h,range.x = range(times_x),
                             n.points = max(100L, length(times_x)),values_x)
